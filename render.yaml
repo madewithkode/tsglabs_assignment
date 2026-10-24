@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: swiftbox-dispatch-tools
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: MCP_BEARER_TOKEN
+        generateValue: true
+      # Logs the headers and MCP _meta Chord sends with each tool call (secrets redacted).
+      - key: LOG_REQUEST_CONTEXT
+        value: "1"
