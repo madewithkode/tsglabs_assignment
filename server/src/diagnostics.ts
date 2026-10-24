@@ -4,7 +4,7 @@
  * If every id a call uses was issued seconds earlier in the same turn, it does not.
  */
 
-import type { ToolContext } from './tools/context.js';
+import { quoteIdFrom, type ToolContext } from './tools/context.js';
 
 const EMAIL = /[^\s@"]+@([^\s@"]+)/g;
 /** Seven or more digits, allowing a leading + and spaces/dashes: a phone number, not a house number. */
@@ -34,6 +34,7 @@ const ID_ARGUMENTS = {
   pickup_address_id: 'addresses',
   dropoff_address_id: 'addresses',
   quote_id: 'quotes',
+  reference: 'quotes',
 } as const;
 
 /** e.g. "pickup_address_id=A76UJG issued 127s ago, quote_id=QZZZZZ unknown or expired". */
@@ -42,7 +43,8 @@ export function describeIdAges(args: Record<string, unknown>, ctx: ToolContext):
     .filter(([name]) => typeof args[name] === 'string')
     .map(([name, store]) => {
       const id = args[name] as string;
-      const age = ctx[store].ageMs(id);
+      // A booking reference is its quote id with a prefix; look the quote up by the bare id.
+      const age = ctx[store].ageMs(store === 'quotes' ? quoteIdFrom(id) : id);
       return age === undefined ? `${name}=${id} unknown or expired` : `${name}=${id} issued ${Math.round(age / 1000)}s ago`;
     })
     .join(', ');

@@ -98,6 +98,9 @@ describe('createPayment', () => {
       expires_at_label: '10:30am',
       reused: false,
     });
+    // The reference is what links later messages to this payment, so the customer must see it.
+    expect(result.next_step).toContain(`booking reference (SWB-${quoteId})`);
+    expect(result.next_step).toMatch(/confirm_booking with that reference/);
   });
 
   it('gives the same account again on a repeat call, without a second charge', async () => {

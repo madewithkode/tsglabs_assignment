@@ -4,7 +4,7 @@
  */
 
 import { QUOTE_TTL_MINUTES } from '../config.js';
-import type { Place } from '../services/places.js';
+import type { Place, PlaceSearch } from '../services/places.js';
 import type { PriceBreakdown } from '../services/pricing.js';
 import type { TransferAccount } from '../services/paystack.js';
 import { createStore, TtlStore } from '../services/store.js';
@@ -25,6 +25,8 @@ export interface ToolContext {
   quotes: TtlStore<Quote>;
   /** Transfer accounts already issued, keyed by quote id, so a repeat call returns the same one. */
   payments: TtlStore<TransferAccount>;
+  /** Recent address searches, keyed by their normalised text, so the same words give the same place. */
+  searches: TtlStore<PlaceSearch>;
   now: () => Date;
 }
 
@@ -36,12 +38,21 @@ export function createContext(now: () => Date = () => new Date()): ToolContext {
     addresses: createStore<Place>({ prefix: 'A', ttlMs: QUOTE_TTL_MS, now: clock }),
     quotes: createStore<Quote>({ prefix: 'Q', ttlMs: QUOTE_TTL_MS, now: clock }),
     payments: createStore<TransferAccount>({ prefix: 'P', ttlMs: QUOTE_TTL_MS, now: clock }),
+    searches: createStore<PlaceSearch>({ prefix: 'S', ttlMs: QUOTE_TTL_MS, now: clock }),
     now,
   };
 }
 
-/** Every booking's Paystack reference is derived from its quote, so either finds the other. */
-export const referenceFor = (quoteId: string) => `SWB-${quoteId.trim().toUpperCase()}`;
+/** The bare quote id, whether given as "SWB-Q7K2M9", "q7k2m9" or " swb-q7k2m9 ". */
+export const quoteIdFrom = (referenceOrQuoteId: string) =>
+  referenceOrQuoteId.trim().toUpperCase().replace(/^SWB-/, '');
+
+/**
+ * Every booking's Paystack reference is derived from its quote, so either finds the other.
+ * Accepts a reference as well as a quote id and never doubles the prefix: a model passed
+ * "SWB-Q9AAFY" where a quote id was expected, and "SWB-SWB-Q9AAFY" was not found on Paystack.
+ */
+export const referenceFor = (referenceOrQuoteId: string) => `SWB-${quoteIdFrom(referenceOrQuoteId)}`;
 
 /** Where the agent hands over to a person. Kept identical everywhere so the skill can key on it. */
 export const HAND_OFF =

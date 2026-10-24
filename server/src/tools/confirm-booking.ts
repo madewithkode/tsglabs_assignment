@@ -10,7 +10,7 @@
 import { assignRider, pickupWindow } from '../services/dispatch.js';
 import { verifyTransaction } from '../services/paystack.js';
 import { lagosTime } from '../utils/lagos-time.js';
-import { HAND_OFF, referenceFor, ToolContext } from './context.js';
+import { HAND_OFF, quoteIdFrom, referenceFor, ToolContext } from './context.js';
 
 interface JobEnd {
   address?: string;
@@ -38,16 +38,22 @@ export type ConfirmBookingResult =
 
 const FAILED_STATUSES = new Set(['failed', 'abandoned', 'reversed']);
 
-export async function confirmBooking(input: { quote_id: string }, ctx: ToolContext): Promise<ConfirmBookingResult> {
-  const reference = referenceFor(input.quote_id);
+/**
+ * Takes the booking reference the customer was shown ("SWB-Q7K2M9"), not a bare quote id: it is
+ * the one id that appears in the conversation text, so it survives whatever a channel forgets.
+ */
+export async function confirmBooking(input: { reference: string }, ctx: ToolContext): Promise<ConfirmBookingResult> {
+  const reference = referenceFor(input.reference);
   const verified = await verifyTransaction(reference);
 
   if (!verified.ok) {
     if (verified.reason === 'not_found') {
       return {
         status: 'no_payment_started',
+        // A wrong reference reads as "never started" too, so this must never lead to a second
+        // account for a customer who has already paid into the first.
         next_step:
-          'No transfer account was ever issued for this quote. If the customer has confirmed the quote, call create_payment; if the quote has expired, get a fresh one.',
+          'Paystack has no transfer account under this reference. If the customer says they have already paid, never issue new transfer details: ask them for the booking reference or account number they paid to and check that one, and if it still cannot be found, hand the conversation to a human with handover_to_human. Only if no account was ever sent to them, call create_payment for their confirmed quote.',
       };
     }
     return { status: 'paystack_error', detail: verified.detail, next_step: HAND_OFF };
@@ -67,7 +73,7 @@ export async function confirmBooking(input: { quote_id: string }, ctx: ToolConte
     // of the wrong amount itself (bank.transfer.rejected) rather than recording a success. It is
     // kept as an invariant because the channel can change — a dedicated virtual account accepts
     // any amount, and without this check an underpayment there would book a rider.
-    const expected = meta.total_naira ?? ctx.quotes.get(input.quote_id)?.totalNaira;
+    const expected = meta.total_naira ?? ctx.quotes.get(quoteIdFrom(input.reference))?.totalNaira;
     if (tx.currency !== 'NGN' || expected === undefined || tx.amountNaira !== expected) {
       return {
         status: 'amount_mismatch',

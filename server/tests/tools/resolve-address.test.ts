@@ -56,6 +56,26 @@ describe('resolveAddress', () => {
     expect(result.next_step).toMatch(/Lagos/);
   });
 
+  it('gives the same place for the same text, without asking Google again', async () => {
+    // Searching again on a later message must not silently swap the pickup
+    // ("Lagos House Ikeja" one message, "Lagos State Secretariat" the next).
+    vi.mocked(searchPlaces).mockResolvedValue({ status: 'ok', place: LEKKI });
+    const first = await resolveAddress({ query: 'Lekki Phase 1' }, ctx);
+    const again = await resolveAddress({ query: '  lekki   PHASE 1 ' }, ctx);
+
+    expect(searchPlaces).toHaveBeenCalledTimes(1);
+    expect(again).toMatchObject({ status: 'ok', name: first.status === 'ok' ? first.name : '' });
+  });
+
+  it('does not remember a provider failure', async () => {
+    vi.mocked(searchPlaces)
+      .mockResolvedValueOnce({ status: 'provider_error', detail: 'timeout' })
+      .mockResolvedValueOnce({ status: 'ok', place: LEKKI });
+    await resolveAddress({ query: 'Lekki Phase 1' }, ctx);
+    expect((await resolveAddress({ query: 'Lekki Phase 1' }, ctx)).status).toBe('ok');
+    expect(searchPlaces).toHaveBeenCalledTimes(2);
+  });
+
   it('hands off on a provider failure, keeping the detail for whoever debugs it', async () => {
     vi.mocked(searchPlaces).mockResolvedValue({ status: 'provider_error', detail: 'PERMISSION_DENIED: nope' });
     const result = await resolveAddress({ query: 'Yaba' }, ctx);

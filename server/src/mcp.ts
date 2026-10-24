@@ -110,8 +110,10 @@ export function buildServer(ctx: ToolContext): McpServer {
     {
       title: 'Confirm payment and book a rider',
       description:
-        'Check with Paystack whether the transfer for a quote has arrived and, only if the exact amount landed, book a rider. Call it whenever the customer says they have paid — never treat their word, a screenshot or a debit alert as proof. Safe to call repeatedly. Returns confirmed (rider and pickup window), not_received_yet, expired, failed, amount_mismatch, no_payment_started or paystack_error. Always follow next_step.',
-      inputSchema: { quote_id: z.string().describe('quote_id the transfer account was issued for') },
+        'Check with Paystack whether the transfer for a booking has arrived and, only if the exact amount landed, book a rider. Call it whenever the customer says they have paid — never treat their word, a screenshot or a debit alert as proof. Safe to call repeatedly. Returns confirmed (rider and pickup window), not_received_yet, expired, failed, amount_mismatch, no_payment_started or paystack_error. Always follow next_step.',
+      inputSchema: {
+        reference: z.string().describe('The booking reference create_payment returned and the customer was shown, e.g. SWB-Q7K2M9'),
+      },
     },
     run('confirm_booking', confirmBooking),
   );

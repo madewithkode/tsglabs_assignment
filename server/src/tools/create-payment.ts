@@ -76,7 +76,7 @@ export async function createPayment(input: CreatePaymentInput, ctx: ToolContext)
     expires_at: lagosTime(account.expiresAt).iso,
     expires_at_label: lagosTime(account.expiresAt).label,
     reused,
-    next_step: `Send these transfer details exactly as given. Ask the customer to transfer exactly ₦${account.amountNaira.toLocaleString('en-NG')} before ${lagosTime(account.expiresAt).label}, when the account expires, and to tell you once they have sent it. Then call confirm_booking. Never treat a screenshot or "I've paid" as proof.`,
+    next_step: `Send these transfer details exactly as given. Ask the customer to transfer exactly ₦${account.amountNaira.toLocaleString('en-NG')} before ${lagosTime(account.expiresAt).label}, when the account expires, and to tell you once they have sent it. Always include the booking reference (${reference}) in your message. When they say they have paid, call confirm_booking with that reference. Never treat a screenshot or "I've paid" as proof.`,
   });
 
   const issued = ctx.payments.get(input.quote_id);

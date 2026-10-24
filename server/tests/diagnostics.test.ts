@@ -42,6 +42,14 @@ describe('describeIdAges', () => {
     );
   });
 
+  it('ages a booking reference by the quote it was built from', () => {
+    let now = 0;
+    const ctx = createContext(() => new Date(now));
+    const quoteId = ctx.quotes.put({} as never);
+    now = 40_000;
+    expect(describeIdAges({ reference: `SWB-${quoteId}` }, ctx)).toBe(`reference=SWB-${quoteId} issued 40s ago`);
+  });
+
   it('flags an id the server never issued or has forgotten', () => {
     expect(describeIdAges({ quote_id: 'QZZZZZ' }, createContext())).toBe('quote_id=QZZZZZ unknown or expired');
   });

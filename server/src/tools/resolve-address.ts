@@ -22,11 +22,23 @@ export type ResolveAddressResult =
   | { status: 'out_of_area'; found_in: string; next_step: string }
   | { status: 'provider_error'; detail: string; next_step: string };
 
+/** Case and spacing don't make a different search. */
+const searchKey = (query: string) => query.trim().replace(/\s+/g, ' ');
+
 export async function resolveAddress(
   input: { query: string },
   ctx: ToolContext,
 ): Promise<ResolveAddressResult> {
-  const result = await searchPlaces(input.query);
+  // The same words give the same place for 30 minutes. In the simulator the agent searches again
+  // on later messages, and a fresh search let the pickup change under the customer ("Lagos House
+  // Ikeja", then "Lagos State Secretariat") between the quote and the payment. It also saves Google calls.
+  const key = searchKey(input.query);
+  let result = ctx.searches.get(key);
+  if (!result) {
+    result = await searchPlaces(input.query);
+    // A provider failure is retried next time, never remembered.
+    if (result.status !== 'provider_error') ctx.searches.set(key, result);
+  }
 
   switch (result.status) {
     case 'ok':

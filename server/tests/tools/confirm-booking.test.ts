@@ -33,12 +33,26 @@ beforeEach(() => {
   ctx = createContext(() => new Date('2026-10-21T09:10:00Z'));
 });
 
-const confirm = (quote_id = 'Q7K2M9') => confirmBooking({ quote_id }, ctx);
+const confirm = (reference = 'SWB-Q7K2M9') => confirmBooking({ reference }, ctx);
 
 describe('confirmBooking', () => {
-  it('verifies the payment with Paystack using the reference derived from the quote', async () => {
+  it('verifies the booking reference exactly as the customer was shown it', async () => {
     vi.mocked(verifyTransaction).mockResolvedValue({ ok: true, transaction: transaction({}) });
-    await confirm(' q7k2m9 ');
+    await confirm('SWB-Q7K2M9');
+    expect(verifyTransaction).toHaveBeenCalledWith('SWB-Q7K2M9');
+  });
+
+  it('never doubles the prefix, however the reference is cased or padded', async () => {
+    // A model passed "SWB-Q9AAFY" where a bare quote id was expected; the tool asked Paystack for
+    // "SWB-SWB-Q9AAFY", got not-found, and the agent issued a second account to a paying customer.
+    vi.mocked(verifyTransaction).mockResolvedValue({ ok: true, transaction: transaction({}) });
+    await confirm(' swb-q7k2m9 ');
+    expect(verifyTransaction).toHaveBeenCalledWith('SWB-Q7K2M9');
+  });
+
+  it('accepts the reference without its prefix too', async () => {
+    vi.mocked(verifyTransaction).mockResolvedValue({ ok: true, transaction: transaction({}) });
+    await confirm('q7k2m9');
     expect(verifyTransaction).toHaveBeenCalledWith('SWB-Q7K2M9');
   });
 
@@ -111,7 +125,9 @@ describe('confirmBooking', () => {
     vi.mocked(verifyTransaction).mockResolvedValue({ ok: false, reason: 'not_found', detail: 'Transaction reference not found.' });
     const result = await confirm();
     expect(result.status).toBe('no_payment_started');
-    expect(result.next_step).toMatch(/create_payment/);
+    // A customer who says they have paid must never be handed a second account to pay into.
+    expect(result.next_step).toMatch(/never issue new transfer details/i);
+    expect(result.next_step).toMatch(/handover_to_human/);
   });
 
   it('hands off when Paystack cannot be reached', async () => {
