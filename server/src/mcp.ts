@@ -16,11 +16,6 @@ import { createPayment } from './tools/create-payment.js';
 import { getQuote } from './tools/get-quote.js';
 import { resolveAddress } from './tools/resolve-address.js';
 
-const contact = z.object({
-  name: z.string().describe('Full name of the person the rider will meet'),
-  phone: z.string().describe('Their phone number, as the customer gave it'),
-});
-
 /** The two fields every tool result shares and the call log reads. */
 type ToolResult = { status: string; detail?: string };
 
@@ -99,8 +94,12 @@ export function buildServer(ctx: ToolContext): McpServer {
         quote_id: z.string().describe('quote_id from get_quote'),
         customer_name: z.string().describe('The customer’s full name'),
         customer_email: z.string().describe('The customer’s email address, checked to look valid'),
-        pickup_contact: contact.describe('Who hands the item to the rider'),
-        dropoff_contact: contact.describe('Who receives the item'),
+        // Flat strings on purpose: Chord shows nested object arguments to the model as plain
+        // strings, so a {name, phone} object was rejected on every call (see create-payment.ts).
+        pickup_contact_name: z.string().describe('Full name of the person who hands the item to the rider'),
+        pickup_contact_phone: z.string().describe('Phone number of the pickup contact, as the customer gave it'),
+        dropoff_contact_name: z.string().describe('Full name of the person who receives the item'),
+        dropoff_contact_phone: z.string().describe('Phone number of the drop-off contact, as the customer gave it'),
       },
     },
     run('create_payment', createPayment),

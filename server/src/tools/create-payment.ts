@@ -9,19 +9,22 @@
 
 import { z } from 'zod';
 import { createTransferCharge, TransferAccount } from '../services/paystack.js';
+import { lagosTime } from '../utils/lagos-time.js';
 import { HAND_OFF, referenceFor, ToolContext } from './context.js';
 
-export interface Contact {
-  name: string;
-  phone: string;
-}
-
+/**
+ * Contacts arrive as four flat strings, not as {name, phone} objects. Chord appears to present nested object
+ * arguments to the model as plain strings, so a nested schema was rejected on every call. Flat strings work however
+ * the client renders the schema; the metadata still groups them per end of the job.
+ */
 export interface CreatePaymentInput {
   quote_id: string;
   customer_name: string;
   customer_email: string;
-  pickup_contact: Contact;
-  dropoff_contact: Contact;
+  pickup_contact_name: string;
+  pickup_contact_phone: string;
+  dropoff_contact_name: string;
+  dropoff_contact_phone: string;
 }
 
 export type CreatePaymentResult =
@@ -32,7 +35,10 @@ export type CreatePaymentResult =
       account_number: string;
       account_name: string;
       amount_naira: number;
+      /** Lagos time. */
       expires_at: string;
+      /** Ready to read out, e.g. "2:26pm". */
+      expires_at_label: string;
       /** True when this is the account already issued for this quote, not a new one. */
       reused: boolean;
       next_step: string;
@@ -66,9 +72,11 @@ export async function createPayment(input: CreatePaymentInput, ctx: ToolContext)
     account_number: account.accountNumber,
     account_name: account.accountName,
     amount_naira: account.amountNaira,
-    expires_at: account.expiresAt,
+    // Paystack reports the expiry in UTC; the model only ever sees Lagos time.
+    expires_at: lagosTime(account.expiresAt).iso,
+    expires_at_label: lagosTime(account.expiresAt).label,
     reused,
-    next_step: `Send these transfer details exactly as given. Ask the customer to transfer exactly ₦${account.amountNaira.toLocaleString('en-NG')} before the account expires, and to tell you once they have sent it. Then call confirm_booking. Never treat a screenshot or "I've paid" as proof.`,
+    next_step: `Send these transfer details exactly as given. Ask the customer to transfer exactly ₦${account.amountNaira.toLocaleString('en-NG')} before ${lagosTime(account.expiresAt).label}, when the account expires, and to tell you once they have sent it. Then call confirm_booking. Never treat a screenshot or "I've paid" as proof.`,
   });
 
   const issued = ctx.payments.get(input.quote_id);
@@ -86,8 +94,16 @@ export async function createPayment(input: CreatePaymentInput, ctx: ToolContext)
       item: quote.item,
       road_km: quote.roadKm,
       customer: { name: input.customer_name, email },
-      pickup: { name: quote.pickup.name, address: quote.pickup.address, contact: input.pickup_contact },
-      dropoff: { name: quote.dropoff.name, address: quote.dropoff.address, contact: input.dropoff_contact },
+      pickup: {
+        name: quote.pickup.name,
+        address: quote.pickup.address,
+        contact: { name: input.pickup_contact_name, phone: input.pickup_contact_phone },
+      },
+      dropoff: {
+        name: quote.dropoff.name,
+        address: quote.dropoff.address,
+        contact: { name: input.dropoff_contact_name, phone: input.dropoff_contact_phone },
+      },
       custom_fields: [
         { display_name: 'Pickup', variable_name: 'pickup', value: quote.pickup.address },
         { display_name: 'Drop-off', variable_name: 'dropoff', value: quote.dropoff.address },

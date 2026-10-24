@@ -9,6 +9,7 @@
 import { RATE_CARD, QUOTE_TTL_MINUTES } from '../config.js';
 import { priceRoadDistance, screenStraightLine } from '../services/pricing.js';
 import { roadDistanceMeters } from '../services/routes.js';
+import { lagosTime } from '../utils/lagos-time.js';
 import { HAND_OFF, QUOTE_TTL_MS, ToolContext } from './context.js';
 
 const RE_RESOLVE =
@@ -23,7 +24,10 @@ export type GetQuoteResult =
       road_km: number;
       price: { base_fee: number; per_km: number; distance_charge: number; minimum_applied: boolean };
       total_naira: number;
+      /** Lagos time. */
       expires_at: string;
+      /** Ready to read out, e.g. "2:26pm". */
+      expires_at_label: string;
       valid_for_minutes: number;
       next_step: string;
     }
@@ -89,7 +93,8 @@ export async function getQuote(
       minimum_applied: price.breakdown.minimumApplied,
     },
     total_naira: price.total,
-    expires_at: expiresAt,
+    expires_at: lagosTime(expiresAt).iso,
+    expires_at_label: lagosTime(expiresAt).label,
     valid_for_minutes: QUOTE_TTL_MINUTES,
     next_step:
       'Read back both resolved addresses, the distance and the total in naira exactly as given, and say the price holds for 30 minutes. Ask the customer to confirm before collecting their name and email.',

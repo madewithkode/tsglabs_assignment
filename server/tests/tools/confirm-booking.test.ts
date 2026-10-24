@@ -80,7 +80,12 @@ describe('confirmBooking', () => {
       transaction: transaction({ status: 'ongoing', paidAt: null, gatewayResponse: 'Please make a transfer to the account specified' }),
     });
     const result = await confirm();
-    expect(result).toMatchObject({ status: 'not_received_yet', minutes_left: 20 });
+    expect(result).toMatchObject({
+      status: 'not_received_yet',
+      minutes_left: 20,
+      expires_at: '2026-10-21T10:30:00+01:00',
+      expires_at_label: '10:30am',
+    });
     expect(result.next_step).toMatch(/screenshot/i);
   });
 

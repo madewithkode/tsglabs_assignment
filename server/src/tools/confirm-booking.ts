@@ -9,6 +9,7 @@
 
 import { assignRider, pickupWindow } from '../services/dispatch.js';
 import { verifyTransaction } from '../services/paystack.js';
+import { lagosTime } from '../utils/lagos-time.js';
 import { HAND_OFF, referenceFor, ToolContext } from './context.js';
 
 interface JobEnd {
@@ -29,7 +30,7 @@ export type ConfirmBookingResult =
       item: string;
       next_step: string;
     }
-  | { status: 'not_received_yet'; minutes_left: number; expires_at: string; next_step: string }
+  | { status: 'not_received_yet'; minutes_left: number; expires_at: string; expires_at_label: string; next_step: string }
   | { status: 'amount_mismatch'; expected_naira: number; received_naira: number; currency: string; next_step: string }
   | { status: 'expired' | 'no_payment_started'; next_step: string }
   | { status: 'failed'; paystack_status: string; detail: string; next_step: string }
@@ -121,7 +122,8 @@ export async function confirmBooking(input: { quote_id: string }, ctx: ToolConte
   return {
     status: 'not_received_yet',
     minutes_left: minutesLeft,
-    expires_at: expiresAt,
+    expires_at: expiresAt ? lagosTime(expiresAt).iso : '',
+    expires_at_label: expiresAt ? lagosTime(expiresAt).label : '',
     next_step:
       'Paystack has not received the transfer yet. Tell the customer politely, remind them of the exact amount and account and the minutes left, and ask them to tell you once it has gone through. Transfers usually land within a few minutes. Never confirm a booking on a screenshot or a debit alert.',
   };

@@ -39,7 +39,9 @@ describe('getQuote', () => {
       road_km: 17.73,
       price: { base_fee: 1_500, per_km: 300, distance_charge: 5_318, minimum_applied: false },
       total_naira: 6_900,
-      expires_at: '2026-10-21T09:30:00.000Z',
+      // Lagos time, never raw UTC: a model read "09:30Z" as 9:30am local and called a live quote expired.
+      expires_at: '2026-10-21T10:30:00+01:00',
+      expires_at_label: '10:30am',
     });
     if (result.status !== 'ok') throw new Error('expected ok');
     expect(ctx.quotes.get(result.quote_id)).toMatchObject({

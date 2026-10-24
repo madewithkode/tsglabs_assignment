@@ -38,8 +38,12 @@ const pay = (overrides: Partial<Parameters<typeof createPayment>[0]> = {}) =>
       quote_id: quoteId,
       customer_name: 'Adaeze Okafor',
       customer_email: 'ada@example.com',
-      pickup_contact: { name: 'Adaeze Okafor', phone: '08030000001' },
-      dropoff_contact: { name: 'Kunle Bello', phone: '08030000002' },
+      // Flat strings, not {name, phone} objects: Chord shows the model nested object arguments as
+      // plain strings, so a nested schema was rejected on every call in the console.
+      pickup_contact_name: 'Adaeze Okafor',
+      pickup_contact_phone: '08030000001',
+      dropoff_contact_name: 'Kunle Bello',
+      dropoff_contact_phone: '08030000002',
       ...overrides,
     },
     ctx,
@@ -59,7 +63,7 @@ describe('createPayment', () => {
     });
   });
 
-  it('records the whole job on the Paystack transaction, so the booking needs no database', async () => {
+  it('records the whole job on the Paystack transaction, contacts grouped, so the booking needs no database', async () => {
     vi.mocked(createTransferCharge).mockResolvedValue({ ok: true, account: ACCOUNT });
     await pay();
 
@@ -90,7 +94,8 @@ describe('createPayment', () => {
       account_number: '1260874612',
       account_name: 'PAYSTACK CHECKOUT',
       amount_naira: 6_900,
-      expires_at: '2026-10-21T09:30:00.000Z',
+      expires_at: '2026-10-21T10:30:00+01:00',
+      expires_at_label: '10:30am',
       reused: false,
     });
   });
