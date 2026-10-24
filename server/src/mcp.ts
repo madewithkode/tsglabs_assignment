@@ -9,6 +9,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { describeIdAges } from './diagnostics.js';
 import { confirmBooking } from './tools/confirm-booking.js';
 import { ToolContext } from './tools/context.js';
 import { createPayment } from './tools/create-payment.js';
@@ -44,11 +45,13 @@ export function buildServer(ctx: ToolContext): McpServer {
           JSON.stringify({ headers: redact(extra.requestInfo?.headers ?? {}), _meta: extra._meta ?? null }),
         );
       }
+      // Measured before the handler runs, so ids it issues itself can't be mistaken for inputs.
+      const ids = describeIdAges(input as Record<string, unknown>, ctx);
       const started = Date.now();
       try {
         const result = await handler(input, ctx);
         const detail = result.detail ? ` — ${result.detail}` : '';
-        console.log(`[mcp] ${name} → ${result.status} (${Date.now() - started}ms)${detail}`);
+        console.log(`[mcp] ${name} → ${result.status} (${Date.now() - started}ms)${detail}${ids ? ` [${ids}]` : ''}`);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
       } catch (error) {
         // Tools are written never to throw; reaching this is a bug, and the agent must not guess.

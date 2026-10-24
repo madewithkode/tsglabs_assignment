@@ -29,7 +29,7 @@ export interface ChargeRequest {
 
 export type ChargeResult =
   | { ok: true; account: TransferAccount }
-  | { ok: false; reason: 'duplicate_reference' | 'invalid_email' | 'paystack_error'; detail: string };
+  | { ok: false; reason: 'duplicate_reference' | 'paystack_error'; detail: string };
 
 export interface Transaction {
   /** Paystack's status: success, ongoing, pending, failed, abandoned, reversed… */

@@ -104,8 +104,6 @@ export async function createPayment(input: CreatePaymentInput, ctx: ToolContext)
   }
 
   switch (charge.reason) {
-    case 'invalid_email':
-      return { status: 'invalid_email', next_step: ASK_EMAIL_AGAIN };
     case 'duplicate_reference':
       return {
         status: 'already_issued',

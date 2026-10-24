@@ -44,6 +44,23 @@ describe('createStore', () => {
     expect(store.get('q7k2m9')).toBe('account');
   });
 
+  it('reports how long ago an id was issued', () => {
+    const c = clock();
+    const store = createStore<string>({ prefix: 'Q', ttlMs: 60_000, now: c.now });
+    const id = store.put('quote');
+    c.advance(2_500);
+    expect(store.ageMs(id.toLowerCase())).toBe(2_500);
+  });
+
+  it('reports no age for an id that is unknown or expired', () => {
+    const c = clock();
+    const store = createStore<string>({ prefix: 'Q', ttlMs: 1000, now: c.now });
+    const id = store.put('quote');
+    c.advance(1001);
+    expect(store.ageMs(id)).toBeUndefined();
+    expect(store.ageMs('QNOPE1')).toBeUndefined();
+  });
+
   it('returns undefined for an id it never issued', () => {
     const store = createStore<string>({ prefix: 'Q', ttlMs: 1000 });
     expect(store.get('QNOPE1')).toBeUndefined();

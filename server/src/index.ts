@@ -8,6 +8,7 @@
 
 import express from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { maskContactDetails } from './diagnostics.js';
 import { buildServer } from './mcp.js';
 import { bearerAuth } from './middleware/bearer-auth.js';
 import { createContext } from './tools/context.js';
@@ -21,6 +22,15 @@ app.get('/health', (_req, res) => {
 });
 
 app.post('/mcp', bearerAuth(process.env.MCP_BEARER_TOKEN), async (req, res) => {
+  // Logged before the MCP library validates the arguments: a call it rejects against the input
+  // schema never reaches a tool, so this line is the only record of what the model actually sent.
+  for (const message of [req.body].flat()) {
+    if (message?.method === 'tools/call') {
+      const args = JSON.stringify(maskContactDetails(message.params?.arguments ?? {}));
+      console.log(`[mcp] call ${message.params?.name} args=${args}`);
+    }
+  }
+
   const server = buildServer(ctx);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => {

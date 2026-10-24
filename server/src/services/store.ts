@@ -18,6 +18,8 @@ export interface TtlStore<T> {
   set(key: string, value: T, ttlMs?: number): void;
   /** The live value, or undefined when it never existed or has expired. */
   get(id: string): T | undefined;
+  /** Milliseconds since a live id was stored, or undefined when it never existed or has expired. */
+  ageMs(id: string): number | undefined;
 }
 
 interface Options {
@@ -30,7 +32,7 @@ interface Options {
 const normalize = (id: string) => id.trim().toUpperCase();
 
 export function createStore<T>({ prefix, ttlMs, now = Date.now }: Options): TtlStore<T> {
-  const entries = new Map<string, { value: T; expiresAt: number }>();
+  const entries = new Map<string, { value: T; storedAt: number; expiresAt: number }>();
 
   const sweep = () => {
     const t = now();
@@ -46,25 +48,36 @@ export function createStore<T>({ prefix, ttlMs, now = Date.now }: Options): TtlS
     return id;
   };
 
+  /** The entry behind an id while it is live; drops it once expired. */
+  const live = (id: string) => {
+    const key = normalize(id);
+    const entry = entries.get(key);
+    if (!entry) return undefined;
+    if (entry.expiresAt <= now()) {
+      entries.delete(key);
+      return undefined;
+    }
+    return entry;
+  };
+
   return {
     put(value) {
       sweep();
       const id = freshId();
-      entries.set(id, { value, expiresAt: now() + ttlMs });
+      const t = now();
+      entries.set(id, { value, storedAt: t, expiresAt: t + ttlMs });
       return id;
     },
     set(key, value, customTtlMs = ttlMs) {
-      entries.set(normalize(key), { value, expiresAt: now() + customTtlMs });
+      const t = now();
+      entries.set(normalize(key), { value, storedAt: t, expiresAt: t + customTtlMs });
     },
     get(id) {
-      const key = normalize(id);
-      const entry = entries.get(key);
-      if (!entry) return undefined;
-      if (entry.expiresAt <= now()) {
-        entries.delete(key);
-        return undefined;
-      }
-      return entry.value;
+      return live(id)?.value;
+    },
+    ageMs(id) {
+      const entry = live(id);
+      return entry ? now() - entry.storedAt : undefined;
     },
   };
 }

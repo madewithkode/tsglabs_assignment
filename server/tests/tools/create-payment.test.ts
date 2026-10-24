@@ -110,11 +110,6 @@ describe('createPayment', () => {
     expect(createTransferCharge).not.toHaveBeenCalled();
   });
 
-  it('passes on an email Paystack itself refuses', async () => {
-    vi.mocked(createTransferCharge).mockResolvedValue({ ok: false, reason: 'invalid_email', detail: 'Invalid email address' });
-    expect((await pay()).status).toBe('invalid_email');
-  });
-
   it('sends the agent back to quoting when the quote has expired', async () => {
     const result = await pay({ quote_id: 'QGONE2' });
     expect(result.status).toBe('quote_expired');

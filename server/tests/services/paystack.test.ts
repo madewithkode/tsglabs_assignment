@@ -78,9 +78,15 @@ describe('createTransferCharge', () => {
     });
   });
 
-  it('recognises an email Paystack will not accept', async () => {
+  it('reports an email Paystack refuses as a plain Paystack error', async () => {
+    // Malformed emails are stopped earlier (the skill, then create_payment's own check), so one
+    // reaching Paystack and being refused is unexpected, and is treated like any other refusal.
     respond({ status: false, message: 'Invalid email address', type: 'validation_error', code: 'invalid_params' }, 400);
-    expect(await createTransferCharge(CHARGE)).toMatchObject({ ok: false, reason: 'invalid_email' });
+    expect(await createTransferCharge(CHARGE)).toEqual({
+      ok: false,
+      reason: 'paystack_error',
+      detail: 'Invalid email address',
+    });
   });
 
   it('reports any other refusal with Paystack’s message', async () => {
