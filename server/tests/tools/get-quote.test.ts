@@ -52,6 +52,29 @@ describe('getQuote', () => {
     });
   });
 
+  it('says when pickup would be if the customer paid now', async () => {
+    // Tuesday 10:00 WAT: a working-hours job goes out within the hour.
+    vi.mocked(roadDistanceMeters).mockResolvedValue({ ok: true, meters: 17_727 });
+    const result = await quote(yaba, lekki);
+    expect(result).toMatchObject({
+      pickup_if_paid_now: { when: 'within_the_hour', label: 'Today, by 11:00am' },
+    });
+    // Nothing unusual to warn about, so the agent isn't told to mention it.
+    expect(result.next_step).not.toMatch(/pickup would be/);
+  });
+
+  it('warns before payment when pickup would be the next working morning', async () => {
+    // Saturday 23:13 WAT: a customer paid, then learned the rider would come on Monday.
+    ctx = createContext(() => new Date('2026-10-24T22:13:00Z'));
+    vi.mocked(roadDistanceMeters).mockResolvedValue({ ok: true, meters: 29_750 });
+    const result = await quote(ctx.addresses.put(YABA), ctx.addresses.put(LEKKI));
+
+    expect(result).toMatchObject({
+      pickup_if_paid_now: { when: 'next_working_morning', label: 'Monday 26 October, 8:00–9:00am' },
+    });
+    expect(result.next_step).toMatch(/pickup would be Monday 26 October, 8:00–9:00am/);
+  });
+
   it('names which address id it no longer recognises', async () => {
     const result = await quote(yaba, 'ANOPE2');
     expect(result).toMatchObject({ status: 'unknown_address_id', which: 'dropoff' });

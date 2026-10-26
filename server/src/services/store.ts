@@ -18,8 +18,6 @@ export interface TtlStore<T> {
   set(key: string, value: T, ttlMs?: number): void;
   /** The live value, or undefined when it never existed or has expired. */
   get(id: string): T | undefined;
-  /** Milliseconds since a live id was stored, or undefined when it never existed or has expired. */
-  ageMs(id: string): number | undefined;
 }
 
 interface Options {
@@ -32,7 +30,7 @@ interface Options {
 const normalize = (id: string) => id.trim().toUpperCase();
 
 export function createStore<T>({ prefix, ttlMs, now = Date.now }: Options): TtlStore<T> {
-  const entries = new Map<string, { value: T; storedAt: number; expiresAt: number }>();
+  const entries = new Map<string, { value: T; expiresAt: number }>();
 
   const sweep = () => {
     const t = now();
@@ -64,20 +62,14 @@ export function createStore<T>({ prefix, ttlMs, now = Date.now }: Options): TtlS
     put(value) {
       sweep();
       const id = freshId();
-      const t = now();
-      entries.set(id, { value, storedAt: t, expiresAt: t + ttlMs });
+      entries.set(id, { value, expiresAt: now() + ttlMs });
       return id;
     },
     set(key, value, customTtlMs = ttlMs) {
-      const t = now();
-      entries.set(normalize(key), { value, storedAt: t, expiresAt: t + customTtlMs });
+      entries.set(normalize(key), { value, expiresAt: now() + customTtlMs });
     },
     get(id) {
       return live(id)?.value;
-    },
-    ageMs(id) {
-      const entry = live(id);
-      return entry ? now() - entry.storedAt : undefined;
     },
   };
 }

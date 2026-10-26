@@ -1,6 +1,6 @@
 # Swiftbox Dispatch: a Chord teammate that books bike deliveries on WhatsApp
 
-A Lagos bike courier takes every booking over WhatsApp. This teammate turns "how much from Yaba to Lekki?" into a paid, confirmed job. It auto prices from the **road distance**, issues a **Paystack transfer account for exactly that price**, and books a rider only once **Paystack confirms the money arrived**. An uploaded payment receipt/screenshot doesn't count.
+A Lagos bike courier takes every booking over WhatsApp. This teammate turns "how much from Yaba to Lekki?" into a paid, confirmed job. It auto prices from the **road distance**, issues a **Paystack transfer account for exactly that price**, and books a rider only once **Paystack confirms the money arrived**. Just sayinh "I've payed" or an uploaded payment receipt/screenshot doesn't count, it uses a real tool call to confirm payments.
 
 See [SUBMISSION.md](SUBMISSION.md) for the role and problem statement, [FIELD_NOTES.md](FIELD_NOTES.md) for what broke, and [GO_LIVE.md](GO_LIVE.md) for the owner's hand-over note.
 
@@ -28,17 +28,28 @@ Every result carries a `next_step` telling the agent what to do with that status
 ## Design choices
 
 - **The model never handles a price.** `get_quote` stores the quote server-side and returns only its id. `create_payment` charges the stored total. The model can't mis-copy an amount, round it, or be talked into "make it ₦3,000". The charge has to be bound to the computed quote, not to an amount the model passes in.
-- **Paystack is the booking record, so there's no database.** `create_payment` writes the whole job (addresses, contacts, item, price) onto the transaction's metadata, with reference `SWB-<quote_id>`. `confirm_booking` rebuilds the booking from Paystack, and rider assignment is deterministic. A booking survives a restart (tested: killed the server, confirmed again, got the same booking), and asking twice can't double-book. Quotes live in memory for 30 minutes. If the server sleeps, the agent re-quotes.
+- **Paystack is the booking record, so there's no database.** `create_payment` writes the whole job (addresses, contacts, item, price) onto the transaction's metadata, with reference `SWB-<quote_id>`. `confirm_booking` rebuilds the booking from Paystack, and rider assignment is deterministic. A booking survives a restart (tested: killed the server, confirmed again, got the same booking), and asking twice can't double-book. Quotes live in memory for 30 minutes. If the server sleeps, the agent re-quotes. This happened for real in a simulator run: Render's free instance restarted between the quote and the payment, the agent re-quoted, and Paystack confirmed the booking as normal.
 - **No fallback price.** Every failure (Google maps down, an address outside Lagos, an address too vague to price) returns a reason and a hand-off, never a guess.
-- **Cheap refusals first.** A straight-line check runs before the paid Routes call, because road distance is never shorter than the straight line. An address matched in the wrong place is refused for free.
 
-## Run it(Locally)
+## Try it now
+
+Nothing needs setting up to try it. Everything is already deployed for this exercise:
+
+- **The teammate is live on my Chord account as Swifty.** Talk to it in the WhatsApp simulator.
+- **The tools run on Render** at `https://tsglabs-assignment.onrender.com`. `GET /health` is public, and `/mcp` needs the bearer token which I already set up on Chord.
+- **Payments are Paystack test mode.** To pay the transfer account the agent gives you, send the exact amount from [Paystack's Demo Bank app](https://demobank.paystackintegrations.com/), then tell the agent you've paid.
+
+Render's free tier sleeps after about 15 minutes idle, so the first message after a quiet spell can take 30–60 seconds while the server wakes. Opening `/health` first wakes it up.
+
+The two sections below are **optional**, for running your own copy.
+
+## Run it locally (optional)
 
 ```bash
 cd server
 cp .env.example .env        # fill in a Paystack TEST key, a Google key, any bearer token
 npm ci
-npm test                    # 89 unit tests; Google and Paystack are mocked
+npm test                    # unit tests; Google and Paystack are mocked
 npm run dev                 # from source, reloads on change; or: npm run build && npm start
 ```
 
@@ -52,12 +63,12 @@ curl -s localhost:3000/mcp -H "Authorization: Bearer $MCP_BEARER_TOKEN" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"resolve_address","arguments":{"query":"Ikeja City Mall"}}}'
 ```
 
-To pay a test transfer account, send the exact amount from Paystack's **Demo Bank** app, then call `confirm_booking`.
+To pay a test transfer account, send the exact amount from [Paystack's Demo Bank app](https://demobank.paystackintegrations.com/), then call `confirm_booking`.
 
-## Deploy
+## Deploy your own (optional)
 
 1. **Render:** New → Blueprint → this repo (uses `render.yaml`). Set `PAYSTACK_SECRET_KEY` and `GOOGLE_MAPS_API_KEY`. `MCP_BEARER_TOKEN` is generated for you. Check `GET /health`.
-2. **Chord:** register the server, give the teammate access, enable it, then probe it:
+2. **Chord:** register the server(I had used the UI as it was more staright-forward), here are steps to do it via the API as gathered from the docs:
    ```bash
    curl -sS -X POST "$CHORD_BASE_URL/v1/workspaces/$WS/mcp-servers" -H "Authorization: Bearer $CHORD_API_KEY" \
      -H 'Content-Type: application/json' -d '{"name":"Swiftbox tools","url":"https://<render-host>/mcp",
@@ -70,7 +81,6 @@ To pay a test transfer account, send the exact amount from Paystack's **Demo Ban
    ```
 3. **Skill:** upload `skill/swiftbox-dispatch/` (the folder, `SKILL.md` as Instructions), then **publish**. A saved draft doesn't change replies.
 
-**Swapping keys:** the server reads `PAYSTACK_SECRET_KEY` and `GOOGLE_MAPS_API_KEY` per request, so you can replace them in Render with your own test keys without redeploying.
 
 ## Layout
 
@@ -86,5 +96,3 @@ server/tests/                mirrors src/; Vitest
 ## How I used AI tools
 
 I built this with Claude Code as a pair. It drafted code and tests from my design decisions. Choosing the problem, the payment and booking approach, and the trade-offs were mine. Every external behaviour was checked against the real APIs, not just mocks: the Paystack DVA gate on my test account, transfer completion, error payloads and district-level geocoding were all found by running real calls, and they changed the design.
-
-Time spent: 5 hours

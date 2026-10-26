@@ -9,7 +9,6 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { describeIdAges } from './diagnostics.js';
 import { confirmBooking } from './tools/confirm-booking.js';
 import { ToolContext } from './tools/context.js';
 import { createPayment } from './tools/create-payment.js';
@@ -19,34 +18,18 @@ import { resolveAddress } from './tools/resolve-address.js';
 /** The two fields every tool result shares and the call log reads. */
 type ToolResult = { status: string; detail?: string };
 
-/** Header names worth seeing when checking what context Chord sends; values of secrets are not. */
-const redact = (headers: Record<string, unknown>) =>
-  Object.fromEntries(
-    Object.entries(headers).map(([k, v]) => [k, /authorization|api-key|cookie/i.test(k) ? '[redacted]' : v]),
-  );
-
 export function buildServer(ctx: ToolContext): McpServer {
   const server = new McpServer({ name: 'swiftbox-dispatch', version: '1.0.0' });
 
   /** Runs a tool, logs one line per call, and wraps the result as MCP text content. */
   const run =
     <I>(name: string, handler: (input: I, ctx: ToolContext) => Promise<ToolResult>) =>
-    async (input: I, extra: { requestInfo?: { headers: Record<string, unknown> }; _meta?: unknown }) => {
-      // The Chord docs don't exactly say whether a tool call carries any thread or sender context we
-      // should look out for so we log the entire thing. Sensitive headers are redacted.
-      if (process.env.LOG_REQUEST_CONTEXT === '1') {
-        console.log(
-          `[mcp] ${name} context`,
-          JSON.stringify({ headers: redact(extra.requestInfo?.headers ?? {}), _meta: extra._meta ?? null }),
-        );
-      }
-      // Measured before the handler runs, so ids it issues itself can't be mistaken for inputs.
-      const ids = describeIdAges(input as Record<string, unknown>, ctx);
+    async (input: I) => {
       const started = Date.now();
       try {
         const result = await handler(input, ctx);
         const detail = result.detail ? ` — ${result.detail}` : '';
-        console.log(`[mcp] ${name} → ${result.status} (${Date.now() - started}ms)${detail}${ids ? ` [${ids}]` : ''}`);
+        console.log(`[mcp] ${name} → ${result.status} (${Date.now() - started}ms)${detail}`);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
       } catch (error) {
         // Tools are written never to throw; reaching this is a bug, and the agent must not guess.

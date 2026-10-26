@@ -7,6 +7,7 @@
  */
 
 import { RATE_CARD, QUOTE_TTL_MINUTES } from '../config.js';
+import { pickupWindow, PickupWindow } from '../services/dispatch.js';
 import { priceRoadDistance, screenStraightLine } from '../services/pricing.js';
 import { roadDistanceMeters } from '../services/routes.js';
 import { lagosTime } from '../utils/lagos-time.js';
@@ -29,6 +30,8 @@ export type GetQuoteResult =
       /** Ready to read out, e.g. "2:26pm". */
       expires_at_label: string;
       valid_for_minutes: number;
+      /** When a rider would come if the customer paid right now, so they know before paying. */
+      pickup_if_paid_now: { when: PickupWindow['when']; label: string };
       next_step: string;
     }
   | { status: 'unknown_address_id'; which: 'pickup' | 'dropoff'; next_step: string }
@@ -80,6 +83,14 @@ export async function getQuote(
     expiresAt,
   });
 
+  // Said before payment, not after: a customer paid at 11pm on a Saturday and only then learned
+  // the rider would come on Monday.
+  const pickupNow = pickupWindow(ctx.now());
+  const pickupWarning =
+    pickupNow.when === 'within_the_hour'
+      ? ''
+      : ` Also tell them that, as it's outside pickup hours, pickup would be ${pickupNow.label} if they pay now.`;
+
   return {
     status: 'ok',
     quote_id: quoteId,
@@ -96,7 +107,7 @@ export async function getQuote(
     expires_at: lagosTime(expiresAt).iso,
     expires_at_label: lagosTime(expiresAt).label,
     valid_for_minutes: QUOTE_TTL_MINUTES,
-    next_step:
-      'Read back both resolved addresses, the distance and the total in naira exactly as given, and say the price holds for 30 minutes. Ask the customer to confirm before collecting their name and email.',
+    pickup_if_paid_now: { when: pickupNow.when, label: pickupNow.label },
+    next_step: `Read back both resolved addresses, the distance and the total in naira exactly as given, and say the price holds for 30 minutes.${pickupWarning} Ask the customer to confirm before collecting their name and email.`,
   };
 }

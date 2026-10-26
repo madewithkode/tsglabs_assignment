@@ -8,7 +8,7 @@
 
 import express from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { maskContactDetails } from './diagnostics.js';
+import { maskContactDetails } from './utils/mask.js';
 import { buildServer } from './mcp.js';
 import { bearerAuth } from './middleware/bearer-auth.js';
 import { createContext } from './tools/context.js';

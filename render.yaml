@@ -16,6 +16,3 @@ services:
         sync: false
       - key: MCP_BEARER_TOKEN
         generateValue: true
-      # Logs the headers and MCP _meta Chord sends with each tool call (secrets redacted).
-      - key: LOG_REQUEST_CONTEXT
-        value: "1"
