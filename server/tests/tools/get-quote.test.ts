@@ -63,6 +63,17 @@ describe('getQuote', () => {
     expect(result.next_step).not.toMatch(/pickup would be/);
   });
 
+  it('tells the agent to stay quiet about a repeat quote whose only change is a later hold time', async () => {
+    // In the simulator the agent re-quotes on later messages; each repeat has a new 30-minute hold.
+    // An always-on "read it back and ask to confirm" made it announce "the hold time has been
+    // refreshed" and re-read the whole quote after the customer had already accepted it.
+    vi.mocked(roadDistanceMeters).mockResolvedValue({ ok: true, meters: 17_727 });
+    const result = await quote(yaba, lekki);
+    expect(result.next_step).toMatch(/If this is the first quote for this trip/);
+    expect(result.next_step).toMatch(/hold time and pickup time moving later is normal and is not a change/);
+    expect(result.next_step).toMatch(/Only tell the customer if the total, an address or the distance is different/);
+  });
+
   it('warns before payment when pickup would be the next working morning', async () => {
     // Saturday 23:13 WAT: a customer paid, then learned the rider would come on Monday.
     ctx = createContext(() => new Date('2026-10-24T22:13:00Z'));

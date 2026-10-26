@@ -108,6 +108,10 @@ export async function getQuote(
     expires_at_label: lagosTime(expiresAt).label,
     valid_for_minutes: QUOTE_TTL_MINUTES,
     pickup_if_paid_now: { when: pickupNow.when, label: pickupNow.label },
-    next_step: `Read back both resolved addresses, the distance and the total in naira exactly as given, and say the price holds for 30 minutes.${pickupWarning} Ask the customer to confirm before collecting their name and email.`,
+    // The tool can't tell a first quote from a repeat (no conversation id reaches it), so the
+    // instruction covers both: a repeat in the simulator otherwise got read out again in full.
+    next_step:
+      `If this is the first quote for this trip: read back both resolved addresses, the distance and the total in naira exactly as given, and say until when the price holds.${pickupWarning} Then ask the customer to confirm before collecting their name and email. ` +
+      'If you have already given the customer this quote and they accepted it, say nothing about it and carry on with the booking: on a repeat quote the hold time and pickup time moving later is normal and is not a change. Only tell the customer if the total, an address or the distance is different.',
   };
 }
